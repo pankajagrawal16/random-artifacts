@@ -18,6 +18,189 @@ However, **Approach 3 is not always the best**:
 - If the workload is primarily **AKS ingress**, **Approach 5** is usually the better fit.
 - If you need a **secondary ingress path for mission-critical resilience**, **Approach 1** can be justified despite its extra complexity and cost.
 
+## Platform Team Scenario: Streamlined Multi-App Exposure
+
+### Context
+
+A platform team wants to provide a **standardized, cost-efficient way** for application teams to expose their services (App Service, Container Apps, Azure Functions) to the internet while maintaining **central control** over ingress security, routing, and configuration.
+
+### Recommended approach: Front Door Premium + Private Link (No App Gateway)
+
+```mermaid
+graph TD
+    Internet["🌐 Internet Users"]
+    FD["Azure Front Door Premium<br/>(WAF + Global Routing)"]
+    PLS1["Private Link Service<br/>Region 1"]
+    PLS2["Private Link Service<br/>Region 2"]
+    
+    AS1["App Service<br/>(Private)"]
+    CA1["Container Apps<br/>(Private)"]
+    AF1["Azure Functions<br/>(Private)"]
+    
+    AS2["App Service<br/>(Private)"]
+    CA2["Container Apps<br/>(Private)"]
+    AF2["Azure Functions<br/>(Private)"]
+    
+    Internet -->|HTTPS| FD
+    FD -->|Private Link| PLS1
+    FD -->|Private Link| PLS2
+    PLS1 --> AS1
+    PLS1 --> CA1
+    PLS1 --> AF1
+    PLS2 --> AS2
+    PLS2 --> CA2
+    PLS2 --> AF2
+    
+    style Internet fill:#e1f5ff
+    style FD fill:#00bcd4
+    style AS1 fill:#81c784
+    style CA1 fill:#81c784
+    style AF1 fill:#81c784
+    style AS2 fill:#81c784
+    style CA2 fill:#81c784
+    style AF2 fill:#81c784
+```
+
+### Why this approach is optimal
+
+| Aspect | Benefit |
+|---|---|
+| **Control** | Platform team owns Front Door origin config; app teams deploy privately only |
+| **Cost** | Lowest cost — no per-region App Gateway; only Front Door Premium charges |
+| **Scale** | Supports 50–300 apps per region without architectural changes |
+| **Unified** | App Service, Container Apps, and Functions exposed identically via Private Link |
+| **Simplicity** | No additional gateway hop; direct Private Link from Front Door to app origins |
+| **Mission-critical** | Aligns with active-active regional stamp architecture pattern |
+
+### Platform team onboarding workflow
+
+```mermaid
+sequenceDiagram
+    participant AppTeam as App Team
+    participant PlatformTeam as Platform Team
+    participant Azure as Azure
+    
+    AppTeam->>Azure: Deploy App Service/Container Apps/Functions (Private)
+    AppTeam->>PlatformTeam: Request exposure: hostname, routing rules
+    PlatformTeam->>Azure: Add Private Link origin to Front Door
+    PlatformTeam->>PlatformTeam: Configure WAF + routing rules
+    Azure-->>AppTeam: ✅ Live on internet via Front Door
+    AppTeam->>Azure: Monitor via Front Door metrics
+```
+
+### Service limits and scaling considerations
+
+| Scale | Limit | Status | Mitigation |
+|---|---|---|---|
+| **50–100 apps/region** | Front Door: 1,000 origins | ✅ Safe | No action needed |
+| **100–300 apps/region** | Front Door: 500 custom domains | ✅ Safe | Use wildcard domain (`*.platform.company.com`) |
+| **300–500 apps/region** | Private Link service: 1,000 connections | ⚠️ Watch | Plan IP space; monitor connections |
+| **500–1,000 apps/region** | VNet subnet exhaustion; route complexity | ⚠️ Plan | Shard by team/workload; add Private Link Services |
+| **1,000+ apps** | Multiple limits reached | 🚨 Redesign | Consider federated Front Door or APIM layer |
+
+### When to add Application Gateway
+
+Add a **regional App Gateway per region** only if you need:
+
+✅ **Central platform team control point** for all app onboarding (instead of individual Front Door origins)  
+✅ **Regional WAF enforcement** independent of Front Door edge WAF  
+✅ **Regional L7 routing** that differs from global routing  
+✅ **Organizational segregation** (each team/workload type gets its own backend pool)  
+
+❌ Do **not** add App Gateway just to scale beyond 300 apps—sharding Private Link Services or federating Front Door instances is better.
+
+### Front Door + App Gateway hybrid (when needed)
+
+```mermaid
+graph TD
+    Internet["🌐 Internet Users"]
+    FD["Azure Front Door Premium<br/>(WAF + Global Routing)"]
+    
+    AG1["App Gateway<br/>Region 1"]
+    AG2["App Gateway<br/>Region 2"]
+    
+    AS1["App Service<br/>(Private)"]
+    CA1["Container Apps<br/>(Private)"]
+    AF1["Azure Functions<br/>(Private)"]
+    
+    AS2["App Service<br/>(Private)"]
+    CA2["Container Apps<br/>(Private)"]
+    AF2["Azure Functions<br/>(Private)"]
+    
+    Internet -->|HTTPS| FD
+    FD -->|Private Link| AG1
+    FD -->|Private Link| AG2
+    
+    AG1 -->|Private pool| AS1
+    AG1 -->|Private pool| CA1
+    AG1 -->|Private pool| AF1
+    
+    AG2 -->|Private pool| AS2
+    AG2 -->|Private pool| CA2
+    AG2 -->|Private pool| AF2
+    
+    style Internet fill:#e1f5ff
+    style FD fill:#00bcd4
+    style AG1 fill:#ff9800
+    style AG2 fill:#ff9800
+    style AS1 fill:#81c784
+    style CA1 fill:#81c784
+    style AF1 fill:#81c784
+    style AS2 fill:#81c784
+    style CA2 fill:#81c784
+    style AF2 fill:#81c784
+```
+
+**Cost impact**: Front Door Premium + App Gateway adds ~$200–400/month per region (2–3x more expensive than Front Door alone). Use only if operational benefits justify the cost.
+
+### Cost comparison (for 500 apps across 2 regions)
+
+| Architecture | Monthly Cost | Best for |
+|---|---|---|
+| **Front Door Premium only** | $50–100 | 50–300 apps; platform team wants minimal infra |
+| **Front Door + App Gateway** | $250–400 | 300–500 apps; platform team wants central control point |
+| **Front Door + Multiple App Gateways** | $400–600+ | 500–1000 apps; organizational segregation needed |
+| **Federated/Multi-region Front Door** | $100–200+ per instance | 1000+ apps; multi-tenant or geography-based segmentation |
+
+### Decision tree
+
+```mermaid
+graph TD
+    A["How many apps per region?"] 
+    
+    A -->|< 100| B["Front Door Premium Only"]
+    A -->|100-300| C{"Need platform<br/>control point?"}
+    A -->|300-500| D{"Need platform<br/>control point?"}
+    A -->|500+| E["Multiple App Gateways<br/>or Federated FD"]
+    
+    C -->|No| F["Front Door Premium Only"]
+    C -->|Yes| G["Front Door + App Gateway"]
+    
+    D -->|No| F
+    D -->|Yes| G
+    
+    B -->|Recommendation| H["✅ Simplest<br/>✅ Lowest cost<br/>✅ No App Gateway"]
+    F -->|Recommendation| H
+    G -->|Recommendation| I["✅ Centralized management<br/>⚠️ Higher cost<br/>⚠️ Extra hop"]
+    E -->|Recommendation| J["🚨 Plan carefully<br/>Consider federation<br/>or organizational sharding"]
+    
+    style H fill:#c8e6c9
+    style I fill:#ffe0b2
+    style J fill:#ffccbc
+```
+
+### Final recommendation for platform teams
+
+1. **Start with Front Door Premium + Private Link** — simplest, most cost-effective
+2. **Monitor Front Door metrics** for origins, custom domains, and routing rule complexity
+3. **At 300+ apps**, evaluate whether adding **regional App Gateway** is worth the cost for operational control
+4. **At 500+ apps**, plan for **App Gateway sharding** (by team/workload) or **Private Link service sharding**
+5. **At 1000+ apps**, consider **federated architecture** or **API Management** layer for true multi-tenant exposure
+
+This approach aligns with **Azure mission-critical architecture patterns** (active-active regional stamps, global Front Door entry, private spoke apps) while giving platform teams a streamlined, scalable exposure model.
+
+
+
 ## Decision guide
 
 | Approach | Best fit | General recommendation |
@@ -325,185 +508,3 @@ This is the **best option for AKS-hosted applications** in the diagram. It is no
 5. [Mission-critical global HTTP ingress](https://learn.microsoft.com/en-us/azure/architecture/guide/networking/global-web-applications/mission-critical-global-http-ingress)
 6. [Protect APIs by using Azure Application Gateway and Azure API Management](https://learn.microsoft.com/en-us/azure/architecture/web-apps/api-management/architectures/protect-apis)
 7. [Use Azure Front Door to secure AKS workloads](https://learn.microsoft.com/en-us/azure/architecture/example-scenario/aks-front-door/aks-front-door)
-
-## Platform Team Scenario: Streamlined Multi-App Exposure
-
-### Context
-
-A platform team wants to provide a **standardized, cost-efficient way** for application teams to expose their services (App Service, Container Apps, Azure Functions) to the internet while maintaining **central control** over ingress security, routing, and configuration.
-
-### Recommended approach: Front Door Premium + Private Link (No App Gateway)
-
-```mermaid
-graph TD
-    Internet["🌐 Internet Users"]
-    FD["Azure Front Door Premium<br/>(WAF + Global Routing)"]
-    PLS1["Private Link Service<br/>Region 1"]
-    PLS2["Private Link Service<br/>Region 2"]
-    
-    AS1["App Service<br/>(Private)"]
-    CA1["Container Apps<br/>(Private)"]
-    AF1["Azure Functions<br/>(Private)"]
-    
-    AS2["App Service<br/>(Private)"]
-    CA2["Container Apps<br/>(Private)"]
-    AF2["Azure Functions<br/>(Private)"]
-    
-    Internet -->|HTTPS| FD
-    FD -->|Private Link| PLS1
-    FD -->|Private Link| PLS2
-    PLS1 --> AS1
-    PLS1 --> CA1
-    PLS1 --> AF1
-    PLS2 --> AS2
-    PLS2 --> CA2
-    PLS2 --> AF2
-    
-    style Internet fill:#e1f5ff
-    style FD fill:#00bcd4
-    style AS1 fill:#81c784
-    style CA1 fill:#81c784
-    style AF1 fill:#81c784
-    style AS2 fill:#81c784
-    style CA2 fill:#81c784
-    style AF2 fill:#81c784
-```
-
-### Why this approach is optimal
-
-| Aspect | Benefit |
-|---|---|
-| **Control** | Platform team owns Front Door origin config; app teams deploy privately only |
-| **Cost** | Lowest cost — no per-region App Gateway; only Front Door Premium charges |
-| **Scale** | Supports 50–300 apps per region without architectural changes |
-| **Unified** | App Service, Container Apps, and Functions exposed identically via Private Link |
-| **Simplicity** | No additional gateway hop; direct Private Link from Front Door to app origins |
-| **Mission-critical** | Aligns with active-active regional stamp architecture pattern |
-
-### Platform team onboarding workflow
-
-```mermaid
-sequenceDiagram
-    participant AppTeam as App Team
-    participant PlatformTeam as Platform Team
-    participant Azure as Azure
-    
-    AppTeam->>Azure: Deploy App Service/Container Apps/Functions (Private)
-    AppTeam->>PlatformTeam: Request exposure: hostname, routing rules
-    PlatformTeam->>Azure: Add Private Link origin to Front Door
-    PlatformTeam->>PlatformTeam: Configure WAF + routing rules
-    Azure-->>AppTeam: ✅ Live on internet via Front Door
-    AppTeam->>Azure: Monitor via Front Door metrics
-```
-
-### Service limits and scaling considerations
-
-| Scale | Limit | Status | Mitigation |
-|---|---|---|---|
-| **50–100 apps/region** | Front Door: 1,000 origins | ✅ Safe | No action needed |
-| **100–300 apps/region** | Front Door: 500 custom domains | ✅ Safe | Use wildcard domain (`*.platform.company.com`) |
-| **300–500 apps/region** | Private Link service: 1,000 connections | ⚠️ Watch | Plan IP space; monitor connections |
-| **500–1,000 apps/region** | VNet subnet exhaustion; route complexity | ⚠️ Plan | Shard by team/workload; add Private Link Services |
-| **1,000+ apps** | Multiple limits reached | 🚨 Redesign | Consider federated Front Door or APIM layer |
-
-### When to add Application Gateway
-
-Add a **regional App Gateway per region** only if you need:
-
-✅ **Central platform team control point** for all app onboarding (instead of individual Front Door origins)  
-✅ **Regional WAF enforcement** independent of Front Door edge WAF  
-✅ **Regional L7 routing** that differs from global routing  
-✅ **Organizational segregation** (each team/workload type gets its own backend pool)  
-
-❌ Do **not** add App Gateway just to scale beyond 300 apps—sharding Private Link Services or federating Front Door instances is better.
-
-### Front Door + App Gateway hybrid (when needed)
-
-```mermaid
-graph TD
-    Internet["🌐 Internet Users"]
-    FD["Azure Front Door Premium<br/>(WAF + Global Routing)"]
-    
-    AG1["App Gateway<br/>Region 1"]
-    AG2["App Gateway<br/>Region 2"]
-    
-    AS1["App Service<br/>(Private)"]
-    CA1["Container Apps<br/>(Private)"]
-    AF1["Azure Functions<br/>(Private)"]
-    
-    AS2["App Service<br/>(Private)"]
-    CA2["Container Apps<br/>(Private)"]
-    AF2["Azure Functions<br/>(Private)"]
-    
-    Internet -->|HTTPS| FD
-    FD -->|Private Link| AG1
-    FD -->|Private Link| AG2
-    
-    AG1 -->|Private pool| AS1
-    AG1 -->|Private pool| CA1
-    AG1 -->|Private pool| AF1
-    
-    AG2 -->|Private pool| AS2
-    AG2 -->|Private pool| CA2
-    AG2 -->|Private pool| AF2
-    
-    style Internet fill:#e1f5ff
-    style FD fill:#00bcd4
-    style AG1 fill:#ff9800
-    style AG2 fill:#ff9800
-    style AS1 fill:#81c784
-    style CA1 fill:#81c784
-    style AF1 fill:#81c784
-    style AS2 fill:#81c784
-    style CA2 fill:#81c784
-    style AF2 fill:#81c784
-```
-
-**Cost impact**: Front Door Premium + App Gateway adds ~$200–400/month per region (2–3x more expensive than Front Door alone). Use only if operational benefits justify the cost.
-
-### Cost comparison (for 500 apps across 2 regions)
-
-| Architecture | Monthly Cost | Best for |
-|---|---|---|
-| **Front Door Premium only** | $50–100 | 50–300 apps; platform team wants minimal infra |
-| **Front Door + App Gateway** | $250–400 | 300–500 apps; platform team wants central control point |
-| **Front Door + Multiple App Gateways** | $400–600+ | 500–1000 apps; organizational segregation needed |
-| **Federated/Multi-region Front Door** | $100–200+ per instance | 1000+ apps; multi-tenant or geography-based segmentation |
-
-### Decision tree
-
-```mermaid
-graph TD
-    A["How many apps per region?"] 
-    
-    A -->|< 100| B["Front Door Premium Only"]
-    A -->|100-300| C{"Need platform<br/>control point?"}
-    A -->|300-500| D{"Need platform<br/>control point?"}
-    A -->|500+| E["Multiple App Gateways<br/>or Federated FD"]
-    
-    C -->|No| F["Front Door Premium Only"]
-    C -->|Yes| G["Front Door + App Gateway"]
-    
-    D -->|No| F
-    D -->|Yes| G
-    
-    B -->|Recommendation| H["✅ Simplest<br/>✅ Lowest cost<br/>✅ No App Gateway"]
-    F -->|Recommendation| H
-    G -->|Recommendation| I["✅ Centralized management<br/>⚠️ Higher cost<br/>⚠️ Extra hop"]
-    E -->|Recommendation| J["🚨 Plan carefully<br/>Consider federation<br/>or organizational sharding"]
-    
-    style H fill:#c8e6c9
-    style I fill:#ffe0b2
-    style J fill:#ffccbc
-```
-
-### Final recommendation for platform teams
-
-1. **Start with Front Door Premium + Private Link** — simplest, most cost-effective
-2. **Monitor Front Door metrics** for origins, custom domains, and routing rule complexity
-3. **At 300+ apps**, evaluate whether adding **regional App Gateway** is worth the cost for operational control
-4. **At 500+ apps**, plan for **App Gateway sharding** (by team/workload) or **Private Link service sharding**
-5. **At 1000+ apps**, consider **federated architecture** or **API Management** layer for true multi-tenant exposure
-
-This approach aligns with **Azure mission-critical architecture patterns** (active-active regional stamps, global Front Door entry, private spoke apps) while giving platform teams a streamlined, scalable exposure model.
-
