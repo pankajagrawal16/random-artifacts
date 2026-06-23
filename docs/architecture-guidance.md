@@ -2,8 +2,6 @@
 
 This document expands the architecture options shown in the image and maps them to Azure Learn and Azure Well-Architected guidance.
 
-> **Terminology note:** the image appears to label the options as `1`, `2`, `3`, `3`, and `5`. In this document, the second `3` is referred to as **Approach 4** for clarity.
-
 ## Executive summary
 
 For a typical **internet-facing, multi-region web application**, the **best default recommendation is Approach 3: Front Door in Hub**.
