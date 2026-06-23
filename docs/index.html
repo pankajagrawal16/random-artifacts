@@ -304,7 +304,7 @@
             typographer: true,
             breaks: true,
             highlight: function (str, lang) {
-                if (lang && hljs) {
+                if (lang && typeof hljs !== 'undefined') {
                     try {
                         return '<pre class="hljs"><code>' +
                             hljs.highlight(lang, str, true).value +
@@ -339,17 +339,38 @@
             return defaultFenceRender(tokens, idx);
         };
         
+        function renderMermaidBlocks() {
+            if (!window.mermaid) {
+                return;
+            }
+
+            // Mermaid v10+ uses run(); keep contentLoaded() for compatibility.
+            if (typeof mermaid.run === 'function') {
+                mermaid.run({ querySelector: '.mermaid' });
+                return;
+            }
+
+            if (typeof mermaid.contentLoaded === 'function') {
+                mermaid.contentLoaded();
+            }
+        }
+
         // Fetch and render markdown
         fetch('architecture-guidance.md')
-            .then(response => response.text())
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`Failed to fetch architecture-guidance.md (${response.status})`);
+                }
+                return response.text();
+            })
             .then(markdown => {
                 const html = md.render(markdown);
                 document.getElementById('markdown-content').innerHTML = html;
-                mermaid.contentLoaded();
+                renderMermaidBlocks();
             })
             .catch(error => {
-                document.getElementById('markdown-content').innerHTML = 
-                    '<p style="color: red;">Error loading architecture guidance. Please check the file path.</p>';
+                document.getElementById('markdown-content').innerHTML =
+                    `<p style="color: red;">Error loading architecture guidance: ${error.message}</p>`;
                 console.error('Error:', error);
             });
     </script>
