@@ -316,8 +316,8 @@
         });
         
         // Custom heading rendering with IDs for anchor links
-        const defaultHeadingRender = md.renderer.rules.heading_open || ((tokens, idx) => md.renderer.renderToken(tokens, idx));
-        md.renderer.rules.heading_open = (tokens, idx) => {
+        const defaultHeadingRender = md.renderer.rules.heading_open || ((tokens, idx, options, env, self) => self.renderToken(tokens, idx, options));
+        md.renderer.rules.heading_open = (tokens, idx, options, env, self) => {
             const token = tokens[idx];
             if (token.tag === 'h1' || token.tag === 'h2' || token.tag === 'h3') {
                 const contentToken = tokens[idx + 1];
@@ -326,7 +326,7 @@
                     token.attrSet('id', id);
                 }
             }
-            return md.renderer.renderToken([token], idx, {});
+            return defaultHeadingRender(tokens, idx, options, env, self);
         };
         
         // Custom rendering for mermaid blocks
