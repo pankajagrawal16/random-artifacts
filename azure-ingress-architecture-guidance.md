@@ -24,6 +24,14 @@ However, **Approach 3 is not always the best**:
 
 A platform team wants to provide a **standardized, cost-efficient way** for application teams to expose their services (App Service, Container Apps, Azure Functions) to the internet while maintaining **central control** over ingress security, routing, and configuration.
 
+### CAF guidance note (explicit)
+
+Azure Cloud Adoption Framework guidance says application delivery should happen within application landing zones and generally advises treating Application Gateway as an app component (spoke/workload aligned), while using Front Door for global HTTP/S delivery.
+
+Reference: [Plan for application delivery (CAF)](https://learn.microsoft.com/en-us/azure/cloud-adoption-framework/ready/azure-best-practices/plan-for-app-delivery)
+
+For cost-sensitive platform teams, a centralized Front Door Premium + Private Link model is a pragmatic interpretation of this guidance, with shared regional App Gateway added only when regional L7 controls are required.
+
 ### Recommended approach: Front Door Premium + Private Link (No App Gateway)
 
 ```mermaid
@@ -99,6 +107,8 @@ sequenceDiagram
 | **1,000+ apps** | Multiple limits reached | 🚨 Redesign | Consider federated Front Door or APIM layer |
 
 ### When to add Application Gateway
+
+See the **CAF guidance note** above for the baseline recommendation and rationale, including the official reference link.
 
 Add a **regional App Gateway per region** only if you need:
 
