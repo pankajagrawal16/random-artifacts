@@ -257,6 +257,152 @@
                 margin: 8px 0;
             }
         }
+
+        /* ── Dark mode toggle button ── */
+        #dark-toggle {
+            margin-left: auto;
+            background: none;
+            border: 2px solid #667eea;
+            border-radius: 20px;
+            padding: 4px 14px;
+            color: #667eea;
+            font-size: 0.85em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s, color 0.2s;
+            white-space: nowrap;
+        }
+        #dark-toggle:hover {
+            background: #667eea;
+            color: white;
+        }
+        nav {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 4px;
+        }
+
+        /* ── Dark mode styles ── */
+        body.dark {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #e0e0e0;
+        }
+        body.dark .container {
+            background: #1e1e2e;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.6);
+        }
+        body.dark nav {
+            background: #252535;
+            border-bottom-color: #383850;
+        }
+        body.dark nav a {
+            color: #a78bfa;
+        }
+        body.dark nav a:hover {
+            color: #c4b5fd;
+        }
+        body.dark #dark-toggle {
+            border-color: #a78bfa;
+            color: #a78bfa;
+        }
+        body.dark #dark-toggle:hover {
+            background: #a78bfa;
+            color: #1e1e2e;
+        }
+        body.dark h1 {
+            color: #a78bfa;
+            border-bottom-color: #a78bfa;
+        }
+        body.dark h2 {
+            color: #c4b5fd;
+        }
+        body.dark h3 {
+            color: #a78bfa;
+        }
+        body.dark h4, body.dark h5, body.dark h6 {
+            color: #b0b0c0;
+        }
+        body.dark p {
+            color: #d0d0e0;
+        }
+        body.dark a {
+            color: #a78bfa;
+        }
+        body.dark a:hover {
+            color: #c4b5fd;
+        }
+        body.dark th {
+            background: #4c1d95;
+        }
+        body.dark td {
+            border-color: #383850;
+            color: #d0d0e0;
+        }
+        body.dark tr:nth-child(even) {
+            background: #252535;
+        }
+        body.dark tr:hover {
+            background: #2e2e45;
+        }
+        body.dark code {
+            background: #2a2a3e;
+            color: #f472b6;
+        }
+        body.dark pre {
+            background: #2a2a3e;
+            border-left-color: #a78bfa;
+        }
+        body.dark pre code {
+            color: #e0e0e0;
+        }
+        body.dark blockquote {
+            border-left-color: #a78bfa;
+            color: #9090a0;
+        }
+        body.dark .mermaid {
+            background: #252535;
+        }
+        body.dark footer {
+            background: #252535;
+            border-top-color: #383850;
+            color: #9090a0;
+        }
+        body.dark .toc {
+            background: #252535;
+        }
+
+        /* Auto dark mode via OS preference (when no manual override) */
+        @media (prefers-color-scheme: dark) {
+            body:not(.light) {
+                background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+                color: #e0e0e0;
+            }
+            body:not(.light) .container { background: #1e1e2e; box-shadow: 0 10px 40px rgba(0,0,0,0.6); }
+            body:not(.light) nav { background: #252535; border-bottom-color: #383850; }
+            body:not(.light) nav a { color: #a78bfa; }
+            body:not(.light) nav a:hover { color: #c4b5fd; }
+            body:not(.light) #dark-toggle { border-color: #a78bfa; color: #a78bfa; }
+            body:not(.light) #dark-toggle:hover { background: #a78bfa; color: #1e1e2e; }
+            body:not(.light) h1 { color: #a78bfa; border-bottom-color: #a78bfa; }
+            body:not(.light) h2 { color: #c4b5fd; }
+            body:not(.light) h3 { color: #a78bfa; }
+            body:not(.light) h4, body:not(.light) h5, body:not(.light) h6 { color: #b0b0c0; }
+            body:not(.light) p { color: #d0d0e0; }
+            body:not(.light) a { color: #a78bfa; }
+            body:not(.light) a:hover { color: #c4b5fd; }
+            body:not(.light) th { background: #4c1d95; }
+            body:not(.light) td { border-color: #383850; color: #d0d0e0; }
+            body:not(.light) tr:nth-child(even) { background: #252535; }
+            body:not(.light) tr:hover { background: #2e2e45; }
+            body:not(.light) code { background: #2a2a3e; color: #f472b6; }
+            body:not(.light) pre { background: #2a2a3e; border-left-color: #a78bfa; }
+            body:not(.light) pre code { color: #e0e0e0; }
+            body:not(.light) blockquote { border-left-color: #a78bfa; color: #9090a0; }
+            body:not(.light) .mermaid { background: #252535; }
+            body:not(.light) footer { background: #252535; border-top-color: #383850; color: #9090a0; }
+            body:not(.light) .toc { background: #252535; }
+        }
     </style>
 </head>
 <body>
@@ -273,6 +419,7 @@
             <a href="#approach-3-front-door-in-hub">Recommended Pattern</a>
             <a href="#approach-4-front-door-and-apim-in-hub">API Pattern</a>
             <a href="#reference-set">References</a>
+            <button id="dark-toggle" onclick="toggleDark()" aria-label="Toggle dark mode">🌙 Dark</button>
         </nav>
         
         <div class="content" id="markdown-content">
@@ -286,8 +433,45 @@
     </div>
     
     <script>
-        // Initialize Mermaid
-        mermaid.initialize({ startOnLoad: true, theme: 'default', securityLevel: 'loose' });
+        // ── Dark mode ──────────────────────────────────────────────────────────
+        function isDark() {
+            const stored = localStorage.getItem('theme');
+            if (stored) return stored === 'dark';
+            return window.matchMedia('(prefers-color-scheme: dark)').matches;
+        }
+
+        function applyTheme(dark) {
+            document.body.classList.toggle('dark', dark);
+            document.body.classList.toggle('light', !dark);
+            const btn = document.getElementById('dark-toggle');
+            if (btn) btn.textContent = dark ? '☀️ Light' : '🌙 Dark';
+        }
+
+        function toggleDark() {
+            const going = !document.body.classList.contains('dark');
+            localStorage.setItem('theme', going ? 'dark' : 'light');
+            applyTheme(going);
+            // Re-initialize Mermaid with the matching theme
+            const mermaidTheme = going ? 'dark' : 'default';
+            mermaid.initialize({ startOnLoad: false, theme: mermaidTheme, securityLevel: 'loose' });
+            document.querySelectorAll('.mermaid').forEach(el => {
+                const src = el.getAttribute('data-src') || el.textContent;
+                if (!el.getAttribute('data-src')) el.setAttribute('data-src', src);
+                el.removeAttribute('data-processed');
+                el.innerHTML = el.getAttribute('data-src');
+            });
+            if (typeof mermaid.run === 'function') {
+                mermaid.run({ querySelector: '.mermaid' });
+            } else if (typeof mermaid.contentLoaded === 'function') {
+                mermaid.contentLoaded();
+            }
+        }
+
+        // Apply saved/OS theme immediately
+        applyTheme(isDark());
+
+        // Initialize Mermaid with matching theme
+        mermaid.initialize({ startOnLoad: true, theme: isDark() ? 'dark' : 'default', securityLevel: 'loose' });
         
         // Helper function to generate slug from text
         function slugify(text) {
